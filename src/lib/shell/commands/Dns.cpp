@@ -283,9 +283,7 @@ CHIP_ERROR BrowseStopHandler(int argc, char ** argv)
 
 } // namespace
 
-void RegisterDnsCommands()
-{
-    static constexpr Command browseSubCommands[] = {
+static constexpr Command kBrowseSubCommands[] = {
         { &BrowseCommissionableHandler, "commissionable",
           "Browse Matter commissionables. Usage: dns browse commissionable [subtype]" },
         { &BrowseCommissionerHandler, "commissioner", "Browse Matter commissioners. Usage: dns browse commissioner [subtype]" },
@@ -294,13 +292,26 @@ void RegisterDnsCommands()
 
     };
 
-    static constexpr Command subCommands[] = {
+CHIP_ERROR BrowseSubCommandsHandler(int argc, char ** argv)
+{
+    return SubShellCommand<GetArraySize(kBrowseSubCommands), kBrowseSubCommands>(argc, argv);
+}
+
+static constexpr Command kSubCommands[] = {
         { &ResolveHandler, "resolve",
           "Resolve Matter operational service. Usage: dns resolve fabricid nodeid (e.g. dns resolve 5544332211 1)" },
-        { &SubShellCommand<ArraySize(browseSubCommands), browseSubCommands>, "browse", "Browse Matter DNS services" },
+        { &BrowseSubCommandsHandler, "browse", "Browse Matter DNS services" },
     };
+     
+CHIP_ERROR SubDnsCommandsHandler(int argc, char ** argv)
+{
+    return SubShellCommand<GetArraySize(kSubCommands), kSubCommands>(argc, argv);
+}
 
-    static constexpr Command dnsCommand = { &SubShellCommand<ArraySize(subCommands), subCommands>, "dns", "DNS client commands" };
+
+void RegisterDnsCommands()
+{
+    static constexpr Command dnsCommand = { &SubDnsCommandsHandler, "dns", "DNS client commands" };
 
     Engine::Root().RegisterCommands(&dnsCommand, 1);
 }

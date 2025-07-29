@@ -146,15 +146,19 @@ WiFiDriver * GetWiFiDriver()
     return sDriver;
 }
 
-void RegisterWiFiCommands()
-{
-    static constexpr Command subCommands[] = {
+static constexpr Command kSubCommands[] = {
         { &WiFiModeHandler, "mode", "Get/Set wifi mode. Usage: wifi mode [disable|ap|sta]" },
         { &WiFiConnectHandler, "connect", "Connect to AP. Usage: wifi connect <ssid> <psk>" },
         { &WiFiDisconnectHandler, "disconnect", "Disconnect device from AP. Usage: wifi disconnect" },
     };
 
-    static constexpr Command wifiCommand = { &SubShellCommand<ArraySize(subCommands), subCommands>, "wifi", "Wi-Fi commands" };
+CHIP_ERROR SubCommandsHandler(int argc, char ** argv)
+{
+    return SubShellCommand<GetArraySize(kSubCommands), kSubCommands>(argc, argv);
+}
+void RegisterWiFiCommands()
+{
+    static constexpr Command wifiCommand = { &SubCommandsHandler, "wifi", "Wi-Fi commands" };
 
     Engine::Root().RegisterCommands(&wifiCommand, 1);
 }

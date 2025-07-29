@@ -80,13 +80,18 @@ CHIP_ERROR BLEAdvertiseHandler(int argc, char ** argv)
     return CHIP_NO_ERROR;
 }
 
+static constexpr Command kSubCommands[] = {
+        { &BLEAdvertiseHandler, "adv", "Manage BLE advertising. Usage: ble adv <start|stop|state>" },
+};
+
+CHIP_ERROR SubBleCommandsHandler(int argc, char ** argv)
+{
+    return SubShellCommand<GetArraySize(kSubCommands), kSubCommands>(argc, argv);
+}
+
 void RegisterBLECommands()
 {
-    static constexpr Command subCommands[] = {
-        { &BLEAdvertiseHandler, "adv", "Manage BLE advertising. Usage: ble adv <start|stop|state>" },
-    };
-
-    static constexpr Command bleCommand = { &SubShellCommand<ArraySize(subCommands), subCommands>, "ble", "Bluetooth LE commands" };
+    static constexpr Command bleCommand = { &SubBleCommandsHandler, "ble", "Bluetooth LE commands" };
 
     Engine::Root().RegisterCommands(&bleCommand, 1);
 }

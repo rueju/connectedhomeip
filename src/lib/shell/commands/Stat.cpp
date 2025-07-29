@@ -88,15 +88,19 @@ CHIP_ERROR StatResetHandler(int argc, char ** argv)
 }
 
 } // namespace
-
-void RegisterStatCommands()
-{
-    static constexpr Command subCommands[] = {
+static constexpr Command kDeviceSubCommands[] = {
         { &StatPeakHandler, "peak", "Print peak usage of system resources" },
         { &StatResetHandler, "reset", "Reset peak usage of system resources" },
     };
 
-    static constexpr Command statCommand = { &SubShellCommand<ArraySize(subCommands), subCommands>, "stat", "Statistics commands" };
+CHIP_ERROR StatSubCommandsHandler(int argc, char ** argv)
+{
+    return SubShellCommand<GetArraySize(kDeviceSubCommands), kDeviceSubCommands>(argc, argv);
+}
+
+void RegisterStatCommands()
+{
+    static constexpr Command statCommand = { &StatSubCommandsHandler, "stat", "Statistics commands" };
 
     Engine::Root().RegisterCommands(&statCommand, 1);
 }

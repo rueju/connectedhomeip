@@ -54,5 +54,9 @@ inline CHIP_ERROR SubShellCommand(int argc, char ** argv)
     return commandSet.ExecCommand(argc, argv);
 }
 
+// Helper to get the size of a static array
+template <typename T, size_t N>
+constexpr size_t GetArraySize(T (&)[N]) { return N; }
+
 } // namespace Shell
 } // namespace chip

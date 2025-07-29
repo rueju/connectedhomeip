@@ -24,6 +24,9 @@
 namespace chip {
 namespace Shell {
 
+
+
+
 static CHIP_ERROR FactoryResetHandler(int argc, char ** argv)
 {
     streamer_printf(streamer_get(), "Performing factory reset ... \r\n");
@@ -31,16 +34,23 @@ static CHIP_ERROR FactoryResetHandler(int argc, char ** argv)
     return CHIP_NO_ERROR;
 }
 
+static constexpr Command kDeviceSubCommands[] = {
+        { &FactoryResetHandler, "factoryreset", "Performs device factory reset" },
+};
+
+
+CHIP_ERROR DeviceSubCommandsHandler(int argc, char ** argv)
+{
+    return SubShellCommand<GetArraySize(kDeviceSubCommands), kDeviceSubCommands>(argc, argv);
+}
+
 void RegisterDeviceCommands()
 {
-    static constexpr Command subCommands[] = {
-        { &FactoryResetHandler, "factoryreset", "Performs device factory reset" },
-    };
 
-    static constexpr Command deviceComand = { &SubShellCommand<ArraySize(subCommands), subCommands>, "device",
-                                              "Device management commands" };
+    //static constexpr Command deviceComand = { &DeviceSubCommandsHandler, subCommands, "device",  "Device management commands" };
+    static constexpr Command deviceCommand = { &DeviceSubCommandsHandler, "device",  "Device management commands" };
 
-    Engine::Root().RegisterCommands(&deviceComand, 1);
+    Engine::Root().RegisterCommands(&deviceCommand, 1);
 }
 
 } // namespace Shell
