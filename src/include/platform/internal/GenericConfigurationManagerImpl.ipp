@@ -44,6 +44,8 @@
 #include <platform/internal/CHIPDeviceLayerInternal.h>
 #include <platform/internal/GenericConfigurationManagerImpl.h>
 #include <platform/internal/GenericDeviceInstanceInfoProvider.ipp>
+#include <fstream>
+#include <string>
 
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
 #include <platform/ThreadStackManager.h>
@@ -646,6 +648,22 @@ bool GenericConfigurationManagerImpl<ConfigClass>::IsCommissionableDeviceNameEna
 template <class ConfigClass>
 CHIP_ERROR GenericConfigurationManagerImpl<ConfigClass>::GetCommissionableDeviceName(char * buf, size_t bufSize)
 {
+    std::ifstream nameFile("/mnt/fuse/info/location");
+    if (nameFile)
+    {
+        std::string name;
+        std::getline(nameFile, name);
+        nameFile.close();
+
+        std::string finalName = "DISH Hopper 3: " + name;
+        if (finalName.size() + 1 > bufSize)
+        {
+            strcpy(buf, "DISH Hopper 3");
+            return CHIP_NO_ERROR;
+        }
+        strcpy(buf, finalName.c_str());
+        return CHIP_NO_ERROR;
+    }
     ReturnErrorCodeIf(bufSize < sizeof(CHIP_DEVICE_CONFIG_DEVICE_NAME), CHIP_ERROR_BUFFER_TOO_SMALL);
     strcpy(buf, CHIP_DEVICE_CONFIG_DEVICE_NAME);
     return CHIP_NO_ERROR;

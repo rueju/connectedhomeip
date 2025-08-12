@@ -22,6 +22,12 @@
 
 #include <list>
 #include <string>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
 
 using namespace chip::app;
 using namespace chip::app::Clusters;
@@ -146,6 +152,243 @@ void ContentLauncherManager::HandleLaunchContent(CommandResponseHelper<LaunchRes
     helper.Success(response);
 }
 
+void LaunchYouTube(const char * url)
+{
+    char buf[512];
+    snprintf(buf, sizeof(buf), "{\"type\":\"youtube\",\"url\":\"%s\"}", url);
+
+    // Write to /tmp/matter.json using fopen/fwrite
+    FILE *out = fopen("/tmp/matter.json", "w");
+    if (out)
+    {
+        fwrite(buf, 1, strlen(buf), out);
+        fclose(out);
+    }
+    else
+    {
+        ChipLogError(Controller, "Failed to write /tmp/matter.json");
+    }
+
+}
+
+void LaunchOmega(const char * url)
+{
+    char buf[512];
+    snprintf(buf, sizeof(buf), "{\"type\":\"omega\",\"url\":\"%s\"}", url);
+
+    // Write to /tmp/matter.json using fopen/fwrite
+    FILE *out = fopen("/tmp/matter.json", "w");
+    if (out)
+    {
+        fwrite(buf, 1, strlen(buf), out);
+        fclose(out);
+    }
+    else
+    {
+        ChipLogError(Controller, "Failed to write /tmp/matter.json");
+    }
+
+}
+
+void SetUnsupportedType(const char * url)
+{
+    char buf[512];
+    snprintf(buf, sizeof(buf), "{\"type\":\"unsupported\",\"url\":\"%s\"}", url);
+
+    // Write to /tmp/matter.json using fopen/fwrite
+    FILE *out = fopen("/tmp/matter.json", "w");
+    if (out)
+    {
+        fwrite(buf, 1, strlen(buf), out);
+        fclose(out);
+    }
+    else
+    {
+        ChipLogError(Controller, "Failed to write /tmp/matter.json");
+    }
+
+}
+
+// Function to convert string to lowercase (helper function)
+void to_lowercase(char* str) {
+    for (int i = 0; str[i]; i++) {
+        str[i] = tolower(str[i]);
+    }
+}
+
+// Function to check if string ends with a specific suffix (case-insensitive)
+int ends_with_ignore_case(const char* str, const char* suffix) {
+    int str_len = strlen(str);
+    int suffix_len = strlen(suffix);
+
+    if (suffix_len > str_len) {
+        return 0;
+    }
+
+    // Create lowercase copies for comparison
+    char str_lower[str_len + 1];
+    char suffix_lower[suffix_len + 1];
+
+    strcpy(str_lower, str + (str_len - suffix_len));
+    strcpy(suffix_lower, suffix);
+
+    to_lowercase(str_lower);
+    to_lowercase(suffix_lower);
+
+    return strcmp(str_lower, suffix_lower) == 0;
+}
+
+// Function to check if string contains substring (case-insensitive)
+int contains_ignore_case(const char* str, const char* substr) {
+    int str_len = strlen(str);
+    int substr_len = strlen(substr);
+
+    char str_lower[str_len + 1];
+    char substr_lower[substr_len + 1];
+
+    strcpy(str_lower, str);
+    strcpy(substr_lower, substr);
+
+    to_lowercase(str_lower);
+    to_lowercase(substr_lower);
+
+    return strstr(str_lower, substr_lower) != NULL;
+}
+
+int check_url_type(const char* url) {
+    if (url == NULL || strlen(url) == 0) {
+        return 0; // Invalid input
+    }
+
+    // Check for YouTube URLs
+    if (strncmp(url, "https://www.youtube.com/watch?v=", 32) == 0 ||
+        strncmp(url, "https://youtube.com/watch?v=", 28) == 0 ||
+        strncmp(url, "https://www.youtu.be/", 21) == 0 ||
+        strncmp(url, "https://youtu.be/", 17) == 0 ||
+        strncmp(url, "http://www.youtube.com/watch?v=", 31) == 0 ||
+        strncmp(url, "http://youtube.com/watch?v=", 27) == 0 ||
+        strncmp(url, "http://www.youtu.be/", 20) == 0 ||
+        strncmp(url, "http://youtu.be/", 16) == 0) {
+        return 1; // YouTube video
+    }
+
+    // Check for manifest URLs
+    // First check file extensions
+    if (ends_with_ignore_case(url, ".mpd") ||
+        ends_with_ignore_case(url, ".m3u8") ||
+        ends_with_ignore_case(url, ".m3u")) {
+        return 2; // Manifest URL
+    }
+
+    // Check for manifest URLs with query parameters
+    if (contains_ignore_case(url, ".mpd?") ||
+        contains_ignore_case(url, ".m3u8?") ||
+        contains_ignore_case(url, ".m3u?")) {
+        return 2; // Manifest URL with parameters
+    }
+
+    // Check for common manifest URL patterns in the path
+    if (contains_ignore_case(url, "/manifest.mpd") ||
+        contains_ignore_case(url, "/playlist.m3u8") ||
+        contains_ignore_case(url, "/master.m3u8") ||
+        contains_ignore_case(url, "/index.m3u8")) {
+        return 2; // Common manifest naming patterns
+    }
+
+    return 0; // Neither YouTube nor manifest
+}
+
+char* convert_to_youtube_tv_url(const char* original_url) {
+    const char* video_id_start = NULL;
+    int video_id_length = 0;
+
+    // Check for standard YouTube URL format
+    const char* youtube_prefix = "https://www.youtube.com/watch?v=";
+    if (strncmp(original_url, youtube_prefix, strlen(youtube_prefix)) == 0) {
+        // Extract video ID from standard format
+        video_id_start = strstr(original_url, "v=");
+        if (video_id_start == NULL) {
+            return NULL;
+        }
+        video_id_start += 2; // Skip "v="
+
+        // Find the end of video ID (stop at & or end of string)
+        const char* video_id_end = strchr(video_id_start, '&');
+        if (video_id_end != NULL) {
+            video_id_length = video_id_end - video_id_start;
+        } else {
+            video_id_length = strlen(video_id_start);
+        }
+    }
+    // Check for shortened youtu.be URL format
+    else {
+        const char* youtu_be_prefix = "https://www.youtu.be/";
+        const char* youtu_be_prefix_alt = "https://youtu.be/";
+
+        if (strncmp(original_url, youtu_be_prefix, strlen(youtu_be_prefix)) == 0) {
+            video_id_start = original_url + strlen(youtu_be_prefix);
+        } else if (strncmp(original_url, youtu_be_prefix_alt, strlen(youtu_be_prefix_alt)) == 0) {
+            video_id_start = original_url + strlen(youtu_be_prefix_alt);
+        } else {
+            return NULL; // Not a recognized YouTube URL format
+        }
+
+        // Find the end of video ID (stop at ? or end of string)
+        const char* video_id_end = strchr(video_id_start, '?');
+        if (video_id_end != NULL) {
+            video_id_length = video_id_end - video_id_start;
+        } else {
+            video_id_length = strlen(video_id_start);
+        }
+    }
+
+    // Validate video ID length (YouTube video IDs are typically 11 characters)
+    if (video_id_length <= 0 || video_id_length > 20) {
+        return NULL;
+    }
+
+    // Calculate the length needed for the new URL
+    const char* tv_prefix = "https://www.youtube.com/tv/#/watch?v=";
+    int new_url_length = strlen(tv_prefix) + video_id_length + 1;
+
+    // Allocate memory for the new URL
+    char* new_url = (char *)malloc(new_url_length);
+    if (new_url == NULL) {
+        return NULL; // Memory allocation failed
+    }
+
+    // Build the new URL
+    strcpy(new_url, tv_prefix);
+    strncat(new_url, video_id_start, video_id_length);
+
+    ChipLogProgress(Zcl, "New YouTube URL: %s", new_url);
+
+    return new_url;
+}
+
+void LaunchUrl(const char * url)
+{
+   int type = check_url_type(url);
+   char *new_url = NULL;
+   ChipLogProgress(Zcl, "URL type : %d", type);
+   if (1 == type)
+   {
+      new_url = convert_to_youtube_tv_url(url);
+      LaunchYouTube(new_url);
+      free(new_url);
+   }
+   else if (2 == type)
+   {
+      ChipLogProgress(Zcl, "MPD URL");
+      LaunchOmega(url);
+   }
+   else
+   {
+      ChipLogProgress(Zcl, "Unsupported type");
+      SetUnsupportedType(url);
+   }
+}
+
 void ContentLauncherManager::HandleLaunchUrl(CommandResponseHelper<LaunchResponseType> & helper, const CharSpan & contentUrl,
                                              const CharSpan & displayString, const BrandingInformationType & brandingInformation)
 {
@@ -160,6 +403,7 @@ void ContentLauncherManager::HandleLaunchUrl(CommandResponseHelper<LaunchRespons
         contentUrlString.c_str(), displayStringString.c_str(), providerNameString.c_str());
 
     // TODO: Insert code here
+    LaunchUrl(contentUrlString.c_str());
     LaunchResponseType response;
     response.data   = chip::MakeOptional(CharSpan::fromCharString("exampleData"));
     response.status = ContentLauncher::StatusEnum::kSuccess;

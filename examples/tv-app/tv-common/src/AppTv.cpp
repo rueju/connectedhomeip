@@ -41,6 +41,7 @@
 #include <platform/DeviceInstanceInfoProvider.h>
 
 #include <string>
+#include <thread>
 
 #if CHIP_DEVICE_CONFIG_ENABLE_BOTH_COMMISSIONER_AND_COMMISSIONEE
 #include <controller/CHIPDeviceController.h>
@@ -58,9 +59,79 @@ using namespace chip::Protocols::UserDirectedCommissioning;
 #if CHIP_DEVICE_CONFIG_ENABLE_BOTH_COMMISSIONER_AND_COMMISSIONEE
 class MyUserPrompter : public UserPrompter
 {
-    // tv should override this with a dialog prompt
     inline void PromptForCommissionOKPermission(uint16_t vendorId, uint16_t productId, const char * commissioneeName) override
     {
+        // Compose the JSON string
+        //std::string json = R"({"type":"popup","text":"TV casting app is requesting permission to cast to this TV, approve? [)";
+        char buf[256];
+        //snprintf(buf, sizeof(buf), "0x%04X,0x%04X,%s,%s", vendorId, productId, commissioneeName, ""); // Add more fields if needed
+        snprintf(buf, sizeof(buf), "{\"type\": \"popup\", \"text\": \"%s is requesting permission to cast to this TV, approve? [0x%04X,0x%04X] \"}", commissioneeName, vendorId, productId);
+        //json += buf;
+        //json += R"(]"})";
+
+        // Write to /tmp/matter.json using fopen/fwrite
+        FILE *out = fopen("/tmp/matter.json", "w");
+        if (out)
+        {
+            //fwrite(json.c_str(), 1, json.size(), out);
+            fwrite(buf, 1, strlen(buf), out);
+            fclose(out);
+        }
+        else
+        {
+            ChipLogError(Controller, "Failed to write /tmp/matter.json");
+        }
+        // Poll for /tmp/matterresponse
+        const int maxPolls = 300; // e.g., poll for up to 30 seconds
+        int polls = 0;
+        while (polls++ < maxPolls)
+        {
+            FILE *in = fopen("/tmp/matterresponse", "r");
+            if (in)
+            {
+                char response[16] = {0};
+                size_t len = fread(response, 1, sizeof(response) - 1, in);
+                fclose(in);
+
+                // Remove trailing newline if present
+                if (len > 0 && response[len - 1] == '\n')
+                {
+                    response[len - 1] = '\0';
+                }
+
+                if (strcmp(response, "ok") == 0)
+                {
+                    ChipLogProgress(Controller, "Rueju: User responded OK to commission prompt.");
+                    CommissionerDiscoveryController * cdc = GetCommissionerDiscoveryController();
+                    if (cdc != nullptr)
+                    {
+                        cdc->Ok();
+                    }
+                }
+                else
+                {
+                    ChipLogProgress(Controller, "Rueju: User responded CANCEL to commission prompt.");
+                    CommissionerDiscoveryController * cdc = GetCommissionerDiscoveryController();
+                    if (cdc != nullptr)
+                    {
+                        cdc->Cancel();
+                    }
+                }
+                // Optionally remove the response file after reading
+                remove("/tmp/matterresponse");
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (polls >= maxPolls)
+        {
+            ChipLogProgress(Controller, "Rueju: No user response to commission prompt (timeout).");
+            CommissionerDiscoveryController * cdc = GetCommissionerDiscoveryController();
+            if (cdc != nullptr)
+            {
+                cdc->Cancel();
+            }
+        }
         return;
     }
 
@@ -87,17 +158,62 @@ class MyUserPrompter : public UserPrompter
     // tv should override this with a dialog prompt
     inline void PromptCommissioningStarted(uint16_t vendorId, uint16_t productId, const char * commissioneeName) override
     {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\": \"notification\", \"text\": \"Started Commissioning %s\"}", commissioneeName); // Add more fields if needed
+        
+        // Write to /tmp/matter.json using fopen/fwrite
+        FILE *out = fopen("/tmp/matter.json", "w");
+        if (out)
+        {
+            fwrite(buf, 1, strlen(buf), out);
+            fclose(out);
+        }
+        else
+        {
+            ChipLogError(Controller, "Failed to write /tmp/matter.json");
+        }
         return;
     }
 
     // tv should override this with a dialog prompt
     inline void PromptCommissioningSucceeded(uint16_t vendorId, uint16_t productId, const char * commissioneeName) override
     {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\": \"notification\", \"text\": \"Successfully Commissioned %s\"}", commissioneeName); // Add more fields if needed
+        
+        // Write to /tmp/matter.json using fopen/fwrite
+        FILE *out = fopen("/tmp/matter.json", "w");
+        if (out)
+        {
+            fwrite(buf, 1, strlen(buf), out);
+            fclose(out);
+        }
+        else
+        {
+            ChipLogError(Controller, "Failed to write /tmp/matter.json");
+        }
         return;
     }
 
     // tv should override this with a dialog prompt
-    inline void PromptCommissioningFailed(const char * commissioneeName, CHIP_ERROR error) override { return; }
+    inline void PromptCommissioningFailed(const char * commissioneeName, CHIP_ERROR error) override 
+    { 
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\": \"notification\", \"text\": \"Failed to Commission %s\"}", commissioneeName); // Add more fields if needed
+        
+        // Write to /tmp/matter.json using fopen/fwrite
+        FILE *out = fopen("/tmp/matter.json", "w");
+        if (out)
+        {
+            fwrite(buf, 1, strlen(buf), out);
+            fclose(out);
+        }
+        else
+        {
+            ChipLogError(Controller, "Failed to write /tmp/matter.json");
+        }
+        return; 
+    }
 };
 
 MyUserPrompter gMyUserPrompter;
